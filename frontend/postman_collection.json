@@ -1,0 +1,98 @@
+{
+  "info": {
+    "_postman_id": "or-logbook-collection",
+    "name": "OR Logbook - API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:5001/or-logbook/us-central1/api",
+      "type": "string"
+    },
+    {
+      "key": "authEmulator",
+      "value": "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1",
+      "type": "string"
+    },
+    {
+      "key": "idToken",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Register user",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"nurse1@orlogbook.com\",\n  \"password\": \"Nurse123!\",\n  \"role\": \"nurse\",\n  \"firstName\": \"Sarah\",\n  \"lastName\": \"Johnson\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{baseUrl}}/api/auth/register"
+      }
+    },
+    {
+      "name": "Sign in (Auth emulator)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"nurse1@orlogbook.com\",\n  \"password\": \"Nurse123!\",\n  \"returnSecureToken\": true\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{authEmulator}}/accounts:signInWithPassword?key=anyKey"
+      },
+      "response": []
+    },
+    {
+      "name": "Create patient (protected)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{idToken}}",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Doe\",\n  \"dateOfBirth\": \"1980-07-15T00:00:00.000Z\",\n  \"medicalRecordNumber\": \"MRN-1001\",\n  \"contact\": \"+1234567890\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{baseUrl}}/api/patients"
+      }
+    }
+  ]
+}

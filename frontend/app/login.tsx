@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Card, Text, TextInput, Title, useTheme, ActivityIndicator } from 'react-native-paper';
-import { signIn, signUp, fetchUserByUID } from '../firebase';
+import { signIn, createUser, fetchUserByUID } from '../firebase';
 
 interface AuthForm {
   fullname?: string;
@@ -37,7 +37,7 @@ export default function LoginScreen() {
         const firstName = names.shift() || '';
         const lastName = names.join(' ') || '';
 
-        const created = await signUp(data.email, data.password, role, { fullname: data.fullname, title: data.title, firstName, lastName });
+        const created = await createUser(data.email, data.password, role, { fullname: data.fullname, title: data.title, firstName, lastName });
 
         // Fetch created user doc by UID to get authoritative role
         const userDoc = await fetchUserByUID(created.uid);

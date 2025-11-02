@@ -4,6 +4,7 @@ import { SafeAreaView, StyleSheet, View } from 'react-native';
 import { Title, Text, Button, ActivityIndicator } from 'react-native-paper';
 import { fetchUserByUID, getCurrentUser, onAuthStateChanged, UserProfile } from '../../firebase';
 import { useRouter } from 'expo-router';
+import { blue100 } from 'react-native-paper/lib/typescript/styles/themes/v2/colors';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -75,11 +76,11 @@ export default function ProfileScreen() {
         <View style={styles.header}>
         {/* Use Avatar.Text instead of external placeholder image */}
         <View style={[styles.avatar, { alignItems: 'center', justifyContent: 'center' }]}>
-          <Title style={{ fontSize: 28 }}>{profile.fullname ? profile.fullname.charAt(0).toUpperCase() : 'U'}</Title>
+          <Title style={{ fontSize: 28 }}>{profile.firstName ? profile.firstName.charAt(0).toUpperCase() : 'U'}</Title>
         </View>
         <View style={styles.userInfo}>
-          <Title style={styles.name}>{profile.fullname || profile.email}</Title>
-          <Text style={styles.role}>{profile.title || profile.role}</Text>
+          <Title style={styles.name}>{profile.firstName? `${profile.firstName} ${profile.lastName}`: profile.email}</Title>
+          <Text style={styles.role}>{profile.title || profile.role.charAt(0).toUpperCase() + profile.role.slice(1)}</Text>
         </View>
       </View>
 
@@ -89,8 +90,8 @@ export default function ProfileScreen() {
 
         {profile.uid && (
           <>
-            <Text style={[styles.label, { marginTop: 12 }]}>User ID</Text>
-            <Text>{profile.uid}</Text>
+            <Text style={[styles.label, { marginTop: 12 }]}>Licence Number</Text>
+            <Text>{profile.licenseNumber}</Text>
           </>
         )}
 
@@ -120,6 +121,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   avatar: { width: 96, height: 96, borderRadius: 48, backgroundColor: '#eee' },
   userInfo: { marginLeft: 12 },
+  license: {color: 'rgba(128, 223, 128, 1)'},
   name: { marginBottom: 4 },
   role: { color: '#666' },
   card: { backgroundColor: '#fafafa', padding: 16, borderRadius: 10, elevation: 2 },

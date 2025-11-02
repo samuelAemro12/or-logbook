@@ -1,7 +1,6 @@
 import { auth, db } from './FirebaseConfig';
 import {
   signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
   onAuthStateChanged as firebaseOnAuthStateChanged,
   User as FirebaseUser,
@@ -26,8 +25,10 @@ export type UserProfile = {
   role: 'admin' | 'surgeon' | 'nurse' | string;
   status?: string;
   createdAt?: string;
-  fullname?: string;
+  firstName?: string;
+  lastName?: string;
   title?: string;
+  licenseNumber?: string;
   [key: string]: any;
 };
 
@@ -87,39 +88,30 @@ export async function signOut(): Promise<void> {
 }
 
 /**
- * Sign up (client-side MVP).
- * TODO: Replace client-side user creation with a Cloud Function using the Admin SDK for production.
- * Client-side creation allows privilege escalation if the client is compromised.
+ * Create user via backend register endpoint so roles/custom-claims are set server-side.
+ * After successful registration we sign the user in using client SDK.
  */
-export async function signUp(
-  email: string,
-  password: string,
-  role: 'admin' | 'surgeon' | 'nurse',
-  extra: { fullname?: string; title?: string; [key: string]: any } = {}
-): Promise<{ uid: string; email: string }> {
-  try {
-    const userCred = await createUserWithEmailAndPassword(auth, email, password);
-    const uid = userCred.user.uid;
+export async function createUser(email: string, password: string, role: string, additional: Record<string, any> = {}) {
+  const base = (process.env.EXPO_PUBLIC_API_BASE_URL || '').replace(/\/$/, '');
+  const url = base ? `${base}/api/auth/register` : '/api/auth/register';
 
-    const payload: Partial<UserProfile> = {
-      uid,
-      email,
-      role,
-      status: 'active',
-      createdAt: new Date().toISOString(),
-      fullname: extra.fullname,
-      title: extra.title,
-      ...extra,
-    };
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password, role, ...additional })
+  });
 
-    // Write Firestore users doc
-    await setDoc(doc(db, 'users', uid), payload as DocumentData);
-
-    return { uid, email };
-  } catch (err: any) {
-    const msg = mapAuthError(err?.code, err?.message || 'Sign up failed');
-    throw new Error(msg);
+  if (!res.ok) {
+    const text = await res.text();
+    let body: any = text;
+    try { body = text ? JSON.parse(text) : text; } catch {}
+    throw new Error((body && body.error) ? body.error : `Failed to create user: ${res.status}`);
   }
+
+  const body = await res.json();
+  // Optionally sign the user in after creation
+  await signIn(email, password);
+  return body.data || body;
 }
 
 /**
@@ -129,9 +121,26 @@ export async function fetchUserByUID(uid: string): Promise<UserProfile | null> {
   try {
     const d = await getDoc(doc(db, 'users', uid));
     if (!d.exists()) return null;
-  const data = d.data() as UserProfile;
-  return { ...(data as UserProfile), uid } as UserProfile;
-  } catch (err: any) {
+
+    const userData = d.data() as UserProfile;
+    const role = userData.role;
+
+    let roleData = null;
+
+    if(role){
+      const roleDoc = await getDoc(doc(db, role.toLowerCase() + 's', uid));
+      console.log("roleDoc : ", roleDoc.exists());
+      if(roleDoc.exists()){
+        roleData = roleDoc.data();
+    }
+  }
+  return {
+  ...userData,
+  ...(roleData || {}),
+  uid,
+};
+
+} catch (err: any) {
     throw new Error('Failed to fetch user by UID: ' + (err?.message || err));
   }
 }

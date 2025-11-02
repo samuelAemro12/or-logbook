@@ -2,19 +2,31 @@
  * Database Initialization Script (JavaScript version)
  * Creates initial admin user and seeds sample data for testing
  */
+process.env.FIREBASE_AUTH_EMULATOR_HOST = process.env.FIREBASE_AUTH_EMULATOR_HOST || 'localhost:9099';
+process.env.FIRESTORE_EMULATOR_HOST = process.env.FIRESTORE_EMULATOR_HOST || 'localhost:8080';
+process.env.FIREBASE_STORAGE_EMULATOR_HOST = process.env.FIREBASE_STORAGE_EMULATOR_HOST || 'localhost:9199';
 
-const admin = require('firebase-admin');
+
+// const admin = require('firebase-admin');
+const { admin, db, auth } = require('../src/config/firebaseConfig');
 const AuthService = require('../src/services/authService');
+const serviceAccount = require('../src/config/serviceAccountKey.json');
 
-// Initialize Firebase Admin SDK for emulators
 if (!admin.apps.length) {
   admin.initializeApp({
-    projectId: process.env.GCLOUD_PROJECT || 'or-logbook'
+    credential: admin.credential.cert(serviceAccount),
+    projectId: serviceAccount.project_id
   });
 }
 
-const db = admin.firestore();
-const auth = admin.auth();
+// if (!admin.apps.length) {
+//   admin.initializeApp({
+//     projectId: process.env.GCLOUD_PROJECT || 'or-logbook'
+//   });
+// }
+
+// const db = admin.firestore();
+// const auth = admin.auth();
 
 const seedData = {
   adminUser: {

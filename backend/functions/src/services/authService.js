@@ -47,11 +47,11 @@ class AuthService {
         if (role === 'nurse') {
           profileData.department = additionalData.department || '';
           profileData.licenseNumber = additionalData.licenseNumber || '';
-          await db.collection('nurses').add(profileData);
+          await db.collection('nurses').doc(userRecord.uid).set(profileData);
         } else if (role === 'surgeon') {
           profileData.specialization = additionalData.specialization || '';
           profileData.licenseNumber = additionalData.licenseNumber || '';
-          await db.collection('surgeons').add(profileData);
+          await db.collection('surgeons').doc(userRecord.uid).set(profileData);
         }
       }
 
