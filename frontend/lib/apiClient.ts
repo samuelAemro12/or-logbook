@@ -1,6 +1,8 @@
 import { auth } from '../FirebaseConfig';
 
-const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:5000';
+// Default to the local Firebase functions emulator URL used during development.
+// You can override this by setting EXPO_PUBLIC_API_BASE_URL in your environment.
+const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://127.0.0.1:5001/or-logbook/us-central1/api';
 
 type FetchOptions = RequestInit & { retry?: boolean };
 
@@ -80,4 +82,25 @@ export default async function apiFetch<T = any>(path: string, options: FetchOpti
   }
 
   return body as T;
+}
+
+// Convenience helpers for common endpoints used by the app
+export async function createPatient(payload: any) {
+  return apiFetch('/api/patients', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function createOperation(payload: any) {
+  return apiFetch('/api/operations', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getSurgeons() {
+  return apiFetch('/api/surgeons');
 }

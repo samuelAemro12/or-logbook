@@ -5,13 +5,16 @@ import { Picker } from '@react-native-picker/picker';
 import cs from './commonStyles';
 import { Title, Text, Button } from 'react-native-paper';
 import { useRouter } from 'expo-router';
+import apiFetch, { createPatient, createOperation, getSurgeons } from '../../lib/apiClient';
+import { useEffect } from 'react';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 export default function AddPatientScreen() {
   const router = useRouter();
 
   // Patient Details
-  const [fullName, setFullName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [patientId, setPatientId] = useState('');
   const [age, setAge] = useState('');
   const [sex, setSex] = useState('Male');
@@ -35,6 +38,8 @@ export default function AddPatientScreen() {
 
   // Surgical Team
   const [surgeon, setSurgeon] = useState('');
+  const [surgeonNameOther, setSurgeonNameOther] = useState('');
+  const [surgeonsList, setSurgeonsList] = useState<Array<any>>([]);
   const [assistants, setAssistants] = useState('');
   const [anesthetist, setAnesthetist] = useState('');
   const [scrub, setScrub] = useState('');
@@ -46,8 +51,12 @@ export default function AddPatientScreen() {
   const [remarks, setRemarks] = useState('');
 
   function handleSave() {
+    setSaving(true);
+    setError('');
+
     const payload = {
-      fullName,
+      firstName,
+      lastName,
       patientId,
       age,
       sex,
@@ -61,6 +70,7 @@ export default function AddPatientScreen() {
       preOp,
       postOp,
       surgeon,
+      surgeonNameOther,
       assistants,
       anesthetist,
       scrub,
@@ -69,9 +79,79 @@ export default function AddPatientScreen() {
       complications,
       remarks,
     };
-    console.log('Save payload:', payload);
-    // TODO: wire to Firestore
+    // Create patient payload expected by backend
+    const patientPayload: any = {
+      firstName: firstName || '',
+      lastName: lastName || '',
+      dateOfBirth: null,
+      medicalRecordNumber: patientId || undefined,
+      contact: undefined,
+      admissionDate:  new Date().toISOString().split('T')[0],
+    };
+
+    // Create patient then create operation that references the patient id
+    (async () => {
+      try {
+        const patientRes = await createPatient(patientPayload);
+  const createdPatient = patientRes.data || patientRes; // adapt to api shape
+  const createdPatientId = createdPatient.id || createdPatient.docId || createdPatient.patientId;
+
+        // Build operation payload
+        const operationPayload: any = {
+          patientId: createdPatientId,
+          surgeonId: surgeon && surgeon !== 'other' ? surgeon : undefined,
+          surgeon: surgeon === 'other' ? surgeonNameOther : undefined,
+          nurseId: undefined,
+          operationType: procedure || 'Unknown',
+          operationDate: surgeryDateObj ? surgeryDateObj.toISOString() : (new Date()).toISOString(),
+          scheduledStartTime: startTimeObj ? startTimeObj.toISOString() : undefined,
+          actualStartTime: startTimeObj ? startTimeObj.toISOString() : undefined,
+          actualEndTime: endTimeObj ? endTimeObj.toISOString() : undefined,
+          operatingRoom: ward || undefined,
+          anesthesiaType: anesthesia,
+          anesthesiologist: anesthetist || undefined,
+          assistantSurgeons: assistants ? assistants.split(',').map(s => s.trim()).filter(Boolean) : [],
+          complications: complications || undefined,
+          outcomes: outcome,
+          notes: remarks || undefined,
+          status: 'scheduled'
+        };
+
+        await createOperation(operationPayload);
+
+        setSaving(false);
+        // Navigate back to nurse dashboard or show success
+        router.replace('/dashboard/nurse');
+      } catch (err: any) {
+        console.error('Save error', err);
+        setError(err?.message || JSON.stringify(err));
+        setSaving(false);
+      }
+    })();
   }
+
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await getSurgeons();
+        const data = res.data || res;
+        if (!mounted) return;
+        if (Array.isArray(data)) {
+          setSurgeonsList(data.map(s => ({ id: s.id || s.uid || s._id, firstName: s.firstName || '', lastName: s.lastName || '' })));
+        } else if (data && data.surgeons) {
+          setSurgeonsList((data.surgeons || []).map((s: { id: any; uid: any; _id: any; firstName: any; lastName: any; }) => ({ id: s.id || s.uid || s._id, firstName: s.firstName || '', lastName: s.lastName || '' })));
+        }
+      } catch (err) {
+        // silently ignore - surgeon list optional
+        console.warn('Failed to fetch surgeons', err);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   return (
     <ProtectedRoute requiredRole={["nurse", "surgeon"]}>
@@ -82,9 +162,11 @@ export default function AddPatientScreen() {
 
           <View style={cs.section}>
             <Text style={cs.sectionTitle}>Patient Details</Text>
-            <Text style={cs.label}>Full Name *</Text>
+            <Text style={cs.label}>First Name *</Text>
+            <TextInput placeholder="First name" value={firstName} onChangeText={setFirstName} style={cs.input} />
 
-            <TextInput placeholder="Full name" value={fullName} onChangeText={setFullName} style={cs.input} />
+            <Text style={cs.label}>Last Name</Text>
+            <TextInput placeholder="Last name" value={lastName} onChangeText={setLastName} style={cs.input} />
 
             <Text style={cs.label}>Patient ID *</Text>
             <TextInput placeholder="Patient ID" value={patientId} onChangeText={setPatientId} style={cs.input} />
@@ -248,8 +330,23 @@ export default function AddPatientScreen() {
 
           <View style={cs.section}>
             <Text style={cs.sectionTitle}>Surgical Team</Text>
-            <Text style={cs.label}>Surgeon Name *</Text>
-            <TextInput placeholder="Surgeon name" value={surgeon} onChangeText={setSurgeon} style={cs.input} />
+            <Text style={cs.label}>Surgeon *</Text>
+            <View style={[cs.input, { paddingHorizontal: 0 }]}> 
+              <Picker
+                selectedValue={surgeon}
+                onValueChange={(v: string) => setSurgeon(v)}
+                style={{ height: 44 }}
+              >
+                <Picker.Item label="Select surgeon" value="" />
+                {surgeonsList.map(s => (
+                  <Picker.Item key={s.id} label={`${s.firstName} ${s.lastName}`} value={s.id} />
+                ))}
+                <Picker.Item label="Other (type name)" value="other" />
+              </Picker>
+            </View>
+            {surgeon === 'other' && (
+              <TextInput placeholder="Enter surgeon name" value={surgeonNameOther} onChangeText={setSurgeonNameOther} style={cs.input} />
+            )}
 
             <Text style={cs.label}>Assistants (comma-separated)</Text>
             <TextInput placeholder="Assistants (comma-separated)" value={assistants} onChangeText={setAssistants} style={cs.input} />
@@ -288,12 +385,13 @@ export default function AddPatientScreen() {
 
           <View style={[cs.actionsRow, { width: '80%', alignSelf: 'center' }]}> 
             <View style={{ flex: 1, marginRight: 8 }}>
-              <Button mode="contained" onPress={handleSave} contentStyle={{ height: 44 }} style={{ width: '100%' }}>Save</Button>
+              <Button mode="contained" onPress={handleSave} contentStyle={{ height: 44 }} style={{ width: '100%' }} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
             </View>
             <View style={{ flex: 1 }}>
               <Button mode="outlined" onPress={() => router.back()} contentStyle={{ height: 44 }} style={{ width: '100%' }}>Cancel</Button>
             </View>
           </View>
+          {error ? <Text style={{ color: 'red', alignSelf: 'center', marginTop: 8 }}>{error}</Text> : null}
           </View>
         </ScrollView>
       </SafeAreaView>

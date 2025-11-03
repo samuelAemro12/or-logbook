@@ -7,6 +7,14 @@ class PatientService {
    */
   static async createPatient(patientData) {
     try {
+
+    if (patientData.dateOfBirth && !(patientData.dateOfBirth instanceof Date)) {
+      patientData.dateOfBirth = new Date(patientData.dateOfBirth);
+    }
+    if (patientData.admissionDate && !(patientData.admissionDate instanceof Date)) {
+      patientData.admissionDate = new Date(patientData.admissionDate);
+    }
+
       // Validate patient data
       const validation = Patient.validate(patientData);
       if (!validation.isValid) {
@@ -116,6 +124,14 @@ class PatientService {
    */
   static async updatePatient(patientId, updateData) {
     try {
+
+    if (updateData.dateOfBirth && !(updateData.dateOfBirth instanceof Date)) {
+      updateData.dateOfBirth = new Date(updateData.dateOfBirth);
+    }
+    if (updateData.admissionDate && !(updateData.admissionDate instanceof Date)) {
+      updateData.admissionDate = new Date(updateData.admissionDate);
+    }
+
       // Check if patient exists
       const patientDoc = await db.collection('patients').doc(patientId).get();
       if (!patientDoc.exists) {

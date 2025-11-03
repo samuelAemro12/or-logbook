@@ -4,7 +4,7 @@ import bodyParser from 'body-parser';
 
 // Import route modules
 const authRoutes = require('./routes/authRoutes');
-const patientRoutes = require('./routes/surgeonRoutes.js');
+const patientRoutes = require('./routes/patientRoutes');
 const surgeonRoutes = require('./routes/surgeonRoutes');
 const operationRoutes = require('./routes/operationRoutes');
 

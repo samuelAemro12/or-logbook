@@ -20,33 +20,34 @@ class Patient {
   static validate(data) {
     const errors = [];
 
-    if (!data.firstName || data.firstName.trim().length === 0) {
-      errors.push('First name is required');
+    if (!data.firstName || data.firstName.trim().length === 0)  {  
+        errors.push("First name is required");
     }
 
     if (!data.lastName || data.lastName.trim().length === 0) {
-      errors.push('Last name is required');
+      errors.push("Last name is required");
     }
 
-    if (!data.dateOfBirth || !this.isValidDate(data.dateOfBirth)) {
-      errors.push('Valid date of birth is required');
+    // dateOfBirth is optional for quick nurse entry; when provided it must be a valid date
+    if (data.dateOfBirth && !this.isValidDate(data.dateOfBirth)) {
+      errors.push("Valid date of birth is required when provided");
     }
 
     if (!data.medicalRecordNumber || data.medicalRecordNumber.trim().length === 0) {
-      errors.push('Medical record number is required');
+      errors.push("Medical record number is required");
     }
 
     if (data.contact && !this.isValidPhone(data.contact)) {
-      errors.push('Valid contact number is required');
+      errors.push("Valid contact number is required");
     }
 
     if (data.admissionDate && !this.isValidDate(data.admissionDate)) {
-      errors.push('Valid admission date is required');
+      errors.push("Valid admission date is required");
     }
 
     return {
       isValid: errors.length === 0,
-      errors
+      errors,
     };
   }
 
@@ -56,7 +57,7 @@ class Patient {
 
   static isValidPhone(phone) {
     const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/;
-    return phoneRegex.test(phone.replace(/[\s\-\(\)]/g, ''));
+    return phoneRegex.test(phone.replace(/[\s\-\(\)]/g, ""));
   }
 
   // Calculate age
@@ -66,26 +67,32 @@ class Patient {
     const birthDate = new Date(this.dateOfBirth);
     let age = today.getFullYear() - birthDate.getFullYear();
     const monthDiff = today.getMonth() - birthDate.getMonth();
-    
+
     if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
       age--;
     }
-    
+
     return age;
   }
 
   // Convert to Firestore document
   toFirestore() {
-    return {
-      firstName: this.firstName,
-      lastName: this.lastName,
-      dateOfBirth: this.dateOfBirth,
-      medicalRecordNumber: this.medicalRecordNumber,
-      contact: this.contact,
-      admissionDate: this.admissionDate,
-      createdAt: this.createdAt,
-      updatedAt: this.updatedAt
+    const data = {
+      firstName: this.firstName ?? null,
+      lastName: this.lastName ?? null,
+      dateOfBirth: this.dateOfBirth ? new Date(this.dateOfBirth) : null,
+      medicalRecordNumber: this.medicalRecordNumber ?? null,
+      contact: this.contact ?? null,
+      admissionDate: this.admissionDate ? new Date(this.admissionDate) : null,
+      createdAt: this.createdAt ? new Date(this.createdAt) : null,
+      updatedAt: this.updatedAt ? new Date(this.updatedAt) : null,
     };
+    Object.keys(data).forEach(key => {
+      if (data[key] === undefined) {
+        delete data[key];
+      }
+    });
+    return data;
   }
 
   // Create from Firestore document
@@ -100,7 +107,7 @@ class Patient {
       contact: data.contact,
       admissionDate: data.admissionDate?.toDate(),
       createdAt: data.createdAt?.toDate(),
-      updatedAt: data.updatedAt?.toDate()
+      updatedAt: data.updatedAt?.toDate(),
     });
   }
 

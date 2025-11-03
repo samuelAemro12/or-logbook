@@ -1,7 +1,7 @@
-const { db } = require('../config/firebaseConfig');
-const Operation = require('../models/Operation');
-const Patient = require('../models/Patient');
-const Surgeon = require('../models/Surgeon');
+const {db} = require("../config/firebaseConfig");
+const Operation = require("../models/Operation");
+const Patient = require("../models/Patient");
+const Surgeon = require("../models/Surgeon");
 
 class OperationService {
   /**
@@ -9,30 +9,45 @@ class OperationService {
    */
   static async createOperation(operationData) {
     try {
+      if (operationData.operationDate && !(operationData.operationDate instanceof Date)) {
+        operationData.operationDate = new Date(operationData.operationDate);
+      }
+      if (operationData.scheduledStartTime && !(operationData.scheduledStartTime instanceof Date)) {
+        operationData.scheduledStartTime = new Date(operationData.scheduledStartTime);
+      }
+      if (operationData.actualStartTime && !(operationData.actualStartTime instanceof Date)) {
+        operationData.actualStartTime = new Date(operationData.actualStartTime);
+      }
+      if (operationData.actualEndTime && !(operationData.actualEndTime instanceof Date)) {
+        operationData.actualEndTime = new Date(operationData.actualEndTime);
+      }
+
       // Validate operation data
       const validation = Operation.validate(operationData);
       if (!validation.isValid) {
-        throw new Error(`Validation failed: ${validation.errors.join(', ')}`);
+        throw new Error(`Validation failed: ${validation.errors.join(", ")}`);
       }
 
       // Verify patient exists
-      const patientDoc = await db.collection('patients').doc(operationData.patientId).get();
+      const patientDoc = await db.collection("patients").doc(operationData.patientId).get();
       if (!patientDoc.exists) {
-        throw new Error('Patient not found');
+        throw new Error("Patient not found");
       }
 
-      // Verify surgeon exists
-      const surgeonDoc = await db.collection('surgeons').doc(operationData.surgeonId).get();
-      if (!surgeonDoc.exists) {
-        throw new Error('Surgeon not found');
+      // Verify surgeon exists if a surgeonId is provided. If not provided allow a surgeon name in operationData.surgeon
+      if (operationData.surgeonId) {
+        const surgeonDoc = await db.collection("surgeons").doc(operationData.surgeonId).get();
+        if (!surgeonDoc.exists) {
+          throw new Error("Surgeon not found");
+        }
       }
 
       // Check for room conflicts
       if (operationData.operatingRoom && operationData.scheduledStartTime) {
-        const conflictQuery = await db.collection('operations')
-          .where('operatingRoom', '==', operationData.operatingRoom)
-          .where('operationDate', '==', operationData.operationDate)
-          .where('status', 'in', ['scheduled', 'in-progress'])
+        const conflictQuery = await db.collection("operations")
+          .where("operatingRoom", "==", operationData.operatingRoom)
+          .where("operationDate", "==", operationData.operationDate)
+          .where("status", "in", ["scheduled", "in-progress"])
           .get();
 
         for (const doc of conflictQuery.docs) {
@@ -46,7 +61,7 @@ class OperationService {
             if ((newStart >= existingStart && newStart < existingEnd) ||
                 (newEnd > existingStart && newEnd <= existingEnd) ||
                 (newStart <= existingStart && newEnd >= existingEnd)) {
-              throw new Error('Operating room conflict detected');
+              throw new Error("Operating room conflict detected");
             }
           }
         }
@@ -55,21 +70,22 @@ class OperationService {
       // Create operation
       const operation = new Operation({
         ...operationData,
+        surgeonName: operationData.surgeon || undefined,
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
       });
 
-      const docRef = await db.collection('operations').add(operation.toFirestore());
+      const docRef = await db.collection("operations").add(operation.toFirestore());
 
       return {
         success: true,
         data: {
           id: docRef.id,
-          ...operation.toFirestore()
-        }
+          ...operation.toFirestore(),
+        },
       };
     } catch (error) {
-      console.error('Error creating operation:', error);
+      console.error("Error creating operation:", error);
       throw new Error(`Failed to create operation: ${error.message}`);
     }
   }
@@ -79,17 +95,17 @@ class OperationService {
    */
   static async getOperationById(operationId) {
     try {
-      const operationDoc = await db.collection('operations').doc(operationId).get();
-      
+      const operationDoc = await db.collection("operations").doc(operationId).get();
+
       if (!operationDoc.exists) {
-        throw new Error('Operation not found');
+        throw new Error("Operation not found");
       }
 
       const operation = Operation.fromFirestore(operationDoc);
 
       // Populate patient data
       try {
-        const patientDoc = await db.collection('patients').doc(operation.patientId).get();
+        const patientDoc = await db.collection("patients").doc(operation.patientId).get();
         if (patientDoc.exists) {
           operation.patient = Patient.fromFirestore(patientDoc);
         }
@@ -99,7 +115,7 @@ class OperationService {
 
       // Populate surgeon data
       try {
-        const surgeonDoc = await db.collection('surgeons').doc(operation.surgeonId).get();
+        const surgeonDoc = await db.collection("surgeons").doc(operation.surgeonId).get();
         if (surgeonDoc.exists) {
           operation.surgeon = Surgeon.fromFirestore(surgeonDoc);
         }
@@ -109,10 +125,10 @@ class OperationService {
 
       return {
         success: true,
-        data: operation
+        data: operation,
       };
     } catch (error) {
-      console.error('Error getting operation:', error);
+      console.error("Error getting operation:", error);
       throw new Error(`Failed to get operation: ${error.message}`);
     }
   }
@@ -122,33 +138,33 @@ class OperationService {
    */
   static async getOperations(filters = {}, page = 1, limit = 10) {
     try {
-      let query = db.collection('operations');
+      let query = db.collection("operations");
 
       // Apply filters
       if (filters.patientId) {
-        query = query.where('patientId', '==', filters.patientId);
+        query = query.where("patientId", "==", filters.patientId);
       }
       if (filters.surgeonId) {
-        query = query.where('surgeonId', '==', filters.surgeonId);
+        query = query.where("surgeonId", "==", filters.surgeonId);
       }
       if (filters.nurseId) {
-        query = query.where('nurseId', '==', filters.nurseId);
+        query = query.where("nurseId", "==", filters.nurseId);
       }
       if (filters.status) {
-        query = query.where('status', '==', filters.status);
+        query = query.where("status", "==", filters.status);
       }
       if (filters.operatingRoom) {
-        query = query.where('operatingRoom', '==', filters.operatingRoom);
+        query = query.where("operatingRoom", "==", filters.operatingRoom);
       }
       if (filters.startDate) {
-        query = query.where('operationDate', '>=', filters.startDate);
+        query = query.where("operationDate", ">=", filters.startDate);
       }
       if (filters.endDate) {
-        query = query.where('operationDate', '<=', filters.endDate);
+        query = query.where("operationDate", "<=", filters.endDate);
       }
 
       // Order by operation date (most recent first)
-      query = query.orderBy('operationDate', 'desc');
+      query = query.orderBy("operationDate", "desc");
 
       // Apply pagination
       const offset = (page - 1) * limit;
@@ -160,7 +176,7 @@ class OperationService {
 
         // Populate patient data
         try {
-          const patientDoc = await db.collection('patients').doc(operation.patientId).get();
+          const patientDoc = await db.collection("patients").doc(operation.patientId).get();
           if (patientDoc.exists) {
             operation.patient = Patient.fromFirestore(patientDoc);
           }
@@ -170,7 +186,7 @@ class OperationService {
 
         // Populate surgeon data
         try {
-          const surgeonDoc = await db.collection('surgeons').doc(operation.surgeonId).get();
+          const surgeonDoc = await db.collection("surgeons").doc(operation.surgeonId).get();
           if (surgeonDoc.exists) {
             operation.surgeon = Surgeon.fromFirestore(surgeonDoc);
           }
@@ -182,14 +198,14 @@ class OperationService {
       }
 
       // Get total count for pagination
-      const totalQuery = db.collection('operations');
-      if (filters.patientId) totalQuery.where('patientId', '==', filters.patientId);
-      if (filters.surgeonId) totalQuery.where('surgeonId', '==', filters.surgeonId);
-      if (filters.nurseId) totalQuery.where('nurseId', '==', filters.nurseId);
-      if (filters.status) totalQuery.where('status', '==', filters.status);
-      if (filters.operatingRoom) totalQuery.where('operatingRoom', '==', filters.operatingRoom);
-      if (filters.startDate) totalQuery.where('operationDate', '>=', filters.startDate);
-      if (filters.endDate) totalQuery.where('operationDate', '<=', filters.endDate);
+      const totalQuery = db.collection("operations");
+      if (filters.patientId) totalQuery.where("patientId", "==", filters.patientId);
+      if (filters.surgeonId) totalQuery.where("surgeonId", "==", filters.surgeonId);
+      if (filters.nurseId) totalQuery.where("nurseId", "==", filters.nurseId);
+      if (filters.status) totalQuery.where("status", "==", filters.status);
+      if (filters.operatingRoom) totalQuery.where("operatingRoom", "==", filters.operatingRoom);
+      if (filters.startDate) totalQuery.where("operationDate", ">=", filters.startDate);
+      if (filters.endDate) totalQuery.where("operationDate", "<=", filters.endDate);
 
       const totalSnapshot = await totalQuery.get();
       const total = totalSnapshot.size;
@@ -202,12 +218,12 @@ class OperationService {
             page,
             limit,
             total,
-            totalPages: Math.ceil(total / limit)
-          }
-        }
+            totalPages: Math.ceil(total / limit),
+          },
+        },
       };
     } catch (error) {
-      console.error('Error getting operations:', error);
+      console.error("Error getting operations:", error);
       throw new Error(`Failed to get operations: ${error.message}`);
     }
   }
@@ -218,15 +234,15 @@ class OperationService {
   static async updateOperation(operationId, updateData) {
     try {
       // Check if operation exists
-      const operationDoc = await db.collection('operations').doc(operationId).get();
+      const operationDoc = await db.collection("operations").doc(operationId).get();
       if (!operationDoc.exists) {
-        throw new Error('Operation not found');
+        throw new Error("Operation not found");
       }
 
       // Validate update data
       const validation = Operation.validate(updateData);
       if (!validation.isValid) {
-        throw new Error(`Validation failed: ${validation.errors.join(', ')}`);
+        throw new Error(`Validation failed: ${validation.errors.join(", ")}`);
       }
 
       // Check for room conflicts if room or time is being updated
@@ -237,10 +253,10 @@ class OperationService {
         const startTime = updateData.scheduledStartTime || existingOp.scheduledStartTime;
 
         if (room && date && startTime) {
-          const conflictQuery = await db.collection('operations')
-            .where('operatingRoom', '==', room)
-            .where('operationDate', '==', date)
-            .where('status', 'in', ['scheduled', 'in-progress'])
+          const conflictQuery = await db.collection("operations")
+            .where("operatingRoom", "==", room)
+            .where("operationDate", "==", date)
+            .where("status", "in", ["scheduled", "in-progress"])
             .get();
 
           for (const doc of conflictQuery.docs) {
@@ -255,7 +271,7 @@ class OperationService {
                 if ((newStart >= existingStart && newStart < existingEnd) ||
                     (newEnd > existingStart && newEnd <= existingEnd) ||
                     (newStart <= existingStart && newEnd >= existingEnd)) {
-                  throw new Error('Operating room conflict detected');
+                  throw new Error("Operating room conflict detected");
                 }
               }
             }
@@ -266,21 +282,21 @@ class OperationService {
       // Update operation
       const updatePayload = {
         ...updateData,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       };
 
-      await db.collection('operations').doc(operationId).update(updatePayload);
+      await db.collection("operations").doc(operationId).update(updatePayload);
 
       // Get updated operation
-      const updatedOperationDoc = await db.collection('operations').doc(operationId).get();
+      const updatedOperationDoc = await db.collection("operations").doc(operationId).get();
       const updatedOperation = Operation.fromFirestore(updatedOperationDoc);
 
       return {
         success: true,
-        data: updatedOperation
+        data: updatedOperation,
       };
     } catch (error) {
-      console.error('Error updating operation:', error);
+      console.error("Error updating operation:", error);
       throw new Error(`Failed to update operation: ${error.message}`);
     }
   }
@@ -291,27 +307,27 @@ class OperationService {
   static async deleteOperation(operationId) {
     try {
       // Check if operation exists
-      const operationDoc = await db.collection('operations').doc(operationId).get();
+      const operationDoc = await db.collection("operations").doc(operationId).get();
       if (!operationDoc.exists) {
-        throw new Error('Operation not found');
+        throw new Error("Operation not found");
       }
 
       const operation = Operation.fromFirestore(operationDoc);
 
       // Only allow deletion of scheduled operations
-      if (operation.status !== 'scheduled') {
-        throw new Error('Only scheduled operations can be deleted');
+      if (operation.status !== "scheduled") {
+        throw new Error("Only scheduled operations can be deleted");
       }
 
       // Delete operation
-      await db.collection('operations').doc(operationId).delete();
+      await db.collection("operations").doc(operationId).delete();
 
       return {
         success: true,
-        data: { message: 'Operation deleted successfully' }
+        data: {message: "Operation deleted successfully"},
       };
     } catch (error) {
-      console.error('Error deleting operation:', error);
+      console.error("Error deleting operation:", error);
       throw new Error(`Failed to delete operation: ${error.message}`);
     }
   }
@@ -323,12 +339,12 @@ class OperationService {
     try {
       const filters = {
         startDate: new Date(startDate),
-        endDate: new Date(endDate)
+        endDate: new Date(endDate),
       };
 
       return await this.getOperations(filters, page, limit);
     } catch (error) {
-      console.error('Error getting operations by date range:', error);
+      console.error("Error getting operations by date range:", error);
       throw new Error(`Failed to get operations by date range: ${error.message}`);
     }
   }
@@ -345,12 +361,12 @@ class OperationService {
 
       const filters = {
         startDate: today,
-        endDate: tomorrow
+        endDate: tomorrow,
       };
 
       return await this.getOperations(filters, page, limit);
     } catch (error) {
-      console.error('Error getting today\'s operations:', error);
+      console.error("Error getting today's operations:", error);
       throw new Error(`Failed to get today's operations: ${error.message}`);
     }
   }
@@ -360,17 +376,17 @@ class OperationService {
    */
   static async getOperationStats(startDate, endDate) {
     try {
-      let query = db.collection('operations');
+      let query = db.collection("operations");
 
       if (startDate) {
-        query = query.where('operationDate', '>=', startDate);
+        query = query.where("operationDate", ">=", startDate);
       }
       if (endDate) {
-        query = query.where('operationDate', '<=', endDate);
+        query = query.where("operationDate", "<=", endDate);
       }
 
       const snapshot = await query.get();
-      
+
       const stats = {
         totalOperations: 0,
         completedOperations: 0,
@@ -380,48 +396,48 @@ class OperationService {
         totalDuration: 0,
         averageDuration: 0,
         operationsByRoom: {},
-        operationsByType: {}
+        operationsByType: {},
       };
 
       let totalDurationMinutes = 0;
       let completedCount = 0;
 
-      snapshot.forEach(doc => {
+      snapshot.forEach((doc) => {
         const operation = Operation.fromFirestore(doc);
         stats.totalOperations++;
 
         // Count by status
         switch (operation.status) {
-          case 'completed':
-            stats.completedOperations++;
-            if (operation.actualStartTime && operation.actualEndTime) {
-              const duration = operation.getDuration();
-              if (duration) {
-                totalDurationMinutes += duration.totalMinutes;
-                completedCount++;
-              }
+        case "completed":
+          stats.completedOperations++;
+          if (operation.actualStartTime && operation.actualEndTime) {
+            const duration = operation.getDuration();
+            if (duration) {
+              totalDurationMinutes += duration.totalMinutes;
+              completedCount++;
             }
-            break;
-          case 'cancelled':
-            stats.cancelledOperations++;
-            break;
-          case 'in-progress':
-            stats.inProgressOperations++;
-            break;
-          case 'scheduled':
-            stats.scheduledOperations++;
-            break;
+          }
+          break;
+        case "cancelled":
+          stats.cancelledOperations++;
+          break;
+        case "in-progress":
+          stats.inProgressOperations++;
+          break;
+        case "scheduled":
+          stats.scheduledOperations++;
+          break;
         }
 
         // Count by room
         if (operation.operatingRoom) {
-          stats.operationsByRoom[operation.operatingRoom] = 
+          stats.operationsByRoom[operation.operatingRoom] =
             (stats.operationsByRoom[operation.operatingRoom] || 0) + 1;
         }
 
         // Count by type
         if (operation.operationType) {
-          stats.operationsByType[operation.operationType] = 
+          stats.operationsByType[operation.operationType] =
             (stats.operationsByType[operation.operationType] || 0) + 1;
         }
       });
@@ -433,10 +449,10 @@ class OperationService {
 
       return {
         success: true,
-        data: stats
+        data: stats,
       };
     } catch (error) {
-      console.error('Error getting operation stats:', error);
+      console.error("Error getting operation stats:", error);
       throw new Error(`Failed to get operation stats: ${error.message}`);
     }
   }

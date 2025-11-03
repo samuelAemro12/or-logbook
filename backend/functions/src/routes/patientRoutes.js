@@ -4,7 +4,7 @@ const PatientController = require('../controllers/patientController');
 const { verifyToken, requireNurseOrAdmin } = require('../middlewares/verifyToken');
 
 // All patient routes require authentication
-// router.use(verifyToken);
+router.use(verifyToken);
 
 // Patient CRUD operations
 router.post('/', requireNurseOrAdmin, PatientController.createPatient);

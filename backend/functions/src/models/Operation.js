@@ -8,6 +8,7 @@ class Operation {
     this.id = data.id;
     this.patientId = data.patientId;
     this.surgeonId = data.surgeonId;
+    this.surgeonName = data.surgeonName;
     this.nurseId = data.nurseId; // Who created the log
     this.operationType = data.operationType;
     this.operationDate = data.operationDate;
@@ -21,7 +22,7 @@ class Operation {
     this.complications = data.complications;
     this.outcomes = data.outcomes;
     this.notes = data.notes;
-    this.status = data.status || 'scheduled'; // scheduled, in-progress, completed, cancelled
+    this.status = data.status || "scheduled"; // scheduled, in-progress, completed, cancelled
     this.createdAt = data.createdAt || new Date();
     this.updatedAt = data.updatedAt || new Date();
   }
@@ -31,44 +32,51 @@ class Operation {
     const errors = [];
 
     if (!data.patientId || data.patientId.trim().length === 0) {
-      errors.push('Patient ID is required');
+      errors.push("Patient ID is required");
     }
 
-    if (!data.surgeonId || data.surgeonId.trim().length === 0) {
-      errors.push('Surgeon ID is required');
+    // Allow either a surgeonId (uid) or a surgeon name string
+    if ((!data.surgeonId || String(data.surgeonId).trim().length === 0) && (!data.surgeon || String(data.surgeon).trim().length === 0)) {
+      errors.push("Surgeon ID or name is required");
     }
 
     if (!data.nurseId || data.nurseId.trim().length === 0) {
-      errors.push('Nurse ID is required');
+      errors.push("Nurse ID is required");
     }
 
     if (!data.operationType || data.operationType.trim().length === 0) {
-      errors.push('Operation type is required');
+      errors.push("Operation type is required");
     }
 
-    if (!data.operationDate || !this.isValidDate(data.operationDate)) {
-      errors.push('Valid operation date is required');
+    // operationDate may be a Date or an ISO string — validate if present
+    if (!data.operationDate) {
+      errors.push("Valid operation date is required");
+    } else {
+      const d = (data.operationDate instanceof Date) ? data.operationDate : new Date(data.operationDate);
+      if (!this.isValidDate(d)) {
+        errors.push("Valid operation date is required");
+      }
     }
 
     if (data.scheduledStartTime && !this.isValidTime(data.scheduledStartTime)) {
-      errors.push('Valid scheduled start time is required');
+      errors.push("Valid scheduled start time is required");
     }
 
     if (data.actualStartTime && !this.isValidTime(data.actualStartTime)) {
-      errors.push('Valid actual start time is required');
+      errors.push("Valid actual start time is required");
     }
 
     if (data.actualEndTime && !this.isValidTime(data.actualEndTime)) {
-      errors.push('Valid actual end time is required');
+      errors.push("Valid actual end time is required");
     }
 
-    if (data.status && !['scheduled', 'in-progress', 'completed', 'cancelled'].includes(data.status)) {
-      errors.push('Status must be scheduled, in-progress, completed, or cancelled');
+    if (data.status && !["scheduled", "in-progress", "completed", "cancelled"].includes(data.status)) {
+      errors.push("Status must be scheduled, in-progress, completed, or cancelled");
     }
 
     return {
       isValid: errors.length === 0,
-      errors
+      errors,
     };
   }
 
@@ -85,28 +93,28 @@ class Operation {
     if (!this.actualStartTime || !this.actualEndTime) {
       return null;
     }
-    
+
     const start = new Date(this.actualStartTime);
     const end = new Date(this.actualEndTime);
     const durationMs = end.getTime() - start.getTime();
-    
+
     if (durationMs < 0) return null;
-    
+
     const hours = Math.floor(durationMs / (1000 * 60 * 60));
     const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
-    
-    return { hours, minutes, totalMinutes: Math.floor(durationMs / (1000 * 60)) };
+
+    return {hours, minutes, totalMinutes: Math.floor(durationMs / (1000 * 60))};
   }
 
   // Check if operation is overdue
   isOverdue() {
-    if (this.status === 'completed' || this.status === 'cancelled') {
+    if (this.status === "completed" || this.status === "cancelled") {
       return false;
     }
-    
+
     const now = new Date();
     const scheduledTime = new Date(this.operationDate);
-    
+
     if (this.scheduledStartTime) {
       scheduledTime.setHours(
         this.scheduledStartTime.getHours(),
@@ -114,21 +122,22 @@ class Operation {
         this.scheduledStartTime.getSeconds()
       );
     }
-    
+
     return now > scheduledTime;
   }
 
   // Convert to Firestore document
   toFirestore() {
-    return {
+    const data = {
       patientId: this.patientId,
       surgeonId: this.surgeonId,
+      surgeonName: this.surgeonName,
       nurseId: this.nurseId,
       operationType: this.operationType,
-      operationDate: this.operationDate,
-      scheduledStartTime: this.scheduledStartTime,
-      actualStartTime: this.actualStartTime,
-      actualEndTime: this.actualEndTime,
+      operationDate: this.operationDate ? new Date(this.operationDate) : null,
+      scheduledStartTime: this.scheduledStartTime ? new Date(this.scheduledStartTime) : null,
+      actualStartTime: this.actualStartTime ? new Date(this.actualStartTime) : null,
+      actualEndTime: this.actualEndTime ? new Date(this.actualEndTime) : null,
       operatingRoom: this.operatingRoom,
       anesthesiaType: this.anesthesiaType,
       anesthesiologist: this.anesthesiologist,
@@ -137,9 +146,15 @@ class Operation {
       outcomes: this.outcomes,
       notes: this.notes,
       status: this.status,
-      createdAt: this.createdAt,
-      updatedAt: this.updatedAt
+      createdAt: this.createdAt ? new Date(this.createdAt) : null,
+      updatedAt: this.updatedAt ? new Date(this.updatedAt) : null,
     };
+    Object.keys(data).forEach(key => {
+      if (data[key] === undefined) {
+        delete data[key];
+      }
+    });
+    return data;
   }
 
   // Create from Firestore document
@@ -149,6 +164,7 @@ class Operation {
       id: doc.id,
       patientId: data.patientId,
       surgeonId: data.surgeonId,
+      surgeonName: data.surgeonName,
       nurseId: data.nurseId,
       operationType: data.operationType,
       operationDate: data.operationDate?.toDate(),
@@ -164,7 +180,7 @@ class Operation {
       notes: data.notes,
       status: data.status,
       createdAt: data.createdAt?.toDate(),
-      updatedAt: data.updatedAt?.toDate()
+      updatedAt: data.updatedAt?.toDate(),
     });
   }
 }
